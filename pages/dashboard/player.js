@@ -70,6 +70,8 @@ export default function PlayerDashboard() {
         .eq('id', user.id)
         .maybeSingle();
 
+      const localPic = localStorage.getItem(`player_profile_pic_${user.id}`);
+
       if (profileData) {
         const mapped = {
           age: profileData.age || '',
@@ -80,7 +82,7 @@ export default function PlayerDashboard() {
           preferredSport: profileData.preferred_sport || 'Cricket',
           bio: profileData.bio || '',
           achievements: profileData.achievements || '',
-          profilePic: profileData.profile_pic || ''
+          profilePic: profileData.profile_pic || localPic || ''
         };
         setProfile(mapped);
         setUpdatedProfile(mapped);
@@ -90,6 +92,19 @@ export default function PlayerDashboard() {
           setEditing(true);
         }
       } else {
+        const defaultProfile = {
+          age: '',
+          dob: '',
+          gender: 'Male',
+          district: '',
+          address: '',
+          preferredSport: 'Cricket',
+          bio: '',
+          achievements: '',
+          profilePic: localPic || ''
+        };
+        setProfile(defaultProfile);
+        setUpdatedProfile(defaultProfile);
         // Force edit mode for new users with no profile record at all
         setEditing(true);
       }
@@ -166,6 +181,11 @@ export default function PlayerDashboard() {
             ...prev,
             profilePic: reader.result
           }));
+          setProfile(prev => ({
+            ...prev,
+            profilePic: reader.result
+          }));
+          localStorage.setItem(`player_profile_pic_${user.id}`, reader.result);
           showToast("Photo loaded locally. Save profile to update!");
         };
         reader.readAsDataURL(file);
@@ -179,6 +199,11 @@ export default function PlayerDashboard() {
           ...prev,
           profilePic: data.publicUrl
         }));
+        setProfile(prev => ({
+          ...prev,
+          profilePic: data.publicUrl
+        }));
+        localStorage.setItem(`player_profile_pic_${user.id}`, data.publicUrl);
         showToast("Profile photo uploaded successfully!");
       }
     } catch (err) {
@@ -194,6 +219,10 @@ export default function PlayerDashboard() {
     setLoading(true);
 
     try {
+      if (updatedProfile.profilePic) {
+        localStorage.setItem(`player_profile_pic_${user.id}`, updatedProfile.profilePic);
+      }
+
       const { error } = await supabase
         .from('player_profiles')
         .upsert({

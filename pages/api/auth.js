@@ -92,7 +92,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ 
         success: true, 
         message: 'Registration initiated. OTP sent to logs.', 
-        email: lowercaseEmail
+        email: lowercaseEmail,
+        otp: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? generatedOtp : undefined
       });
     }
 
@@ -144,13 +145,13 @@ export default async function handler(req, res) {
       }
 
       // Default Admin Bypass Check
-      if (lowercaseEmail === 'lokeshhofficial18@gmail.com' && password === 'admin123') {
+      if (lowercaseEmail === 'adminplaytn@gmail.com' && password === 'babu@01') {
         return res.status(200).json({
           success: true,
           user: {
             id: 99999,
-            name: "Lokesh (Platform Admin)",
-            email: "lokeshhofficial18@gmail.com",
+            name: "Play TN Admin",
+            email: "adminplaytn@gmail.com",
             role: "ADMIN"
           }
         });
@@ -242,7 +243,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ 
         success: true, 
         message: 'Password reset OTP generated and logged.', 
-        email: lowercaseEmail
+        email: lowercaseEmail,
+        otp: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? generatedOtp : undefined
       });
     }
 

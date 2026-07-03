@@ -96,7 +96,8 @@ export default function AdminDashboard() {
           name: t.name,
           sport: t.sport,
           organiser: t.organiser_profiles?.organisation_name || 'Organiser Academy',
-          date: t.tournament_start ? new Date(t.tournament_start).toLocaleDateString() : 'TBD'
+          date: t.tournament_start ? new Date(t.tournament_start).toLocaleDateString() : 'TBD',
+          posterUrl: t.poster_url || ''
         })));
       }
 
@@ -237,6 +238,16 @@ export default function AdminDashboard() {
                       {pendingTournaments.map((t) => (
                         <tr key={t.id} className="border-bottom">
                           <td>
+                            {t.posterUrl && (
+                              <div className="mb-2">
+                                <img 
+                                  src={t.posterUrl} 
+                                  alt="Poster" 
+                                  className="rounded border shadow-sm"
+                                  style={{ height: '80px', width: '60px', objectFit: 'cover' }}
+                                />
+                              </div>
+                            )}
                             <strong className="d-block">{t.name}</strong>
                             <span className="small text-muted">{t.sport} &bull; {t.date}</span>
                           </td>

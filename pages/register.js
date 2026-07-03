@@ -43,7 +43,12 @@ export default function Register() {
         throw new Error(data.error || 'Registration failed');
       }
 
-      showToast(`Account verification OTP generated. Check email/logs!`);
+      if (data.otp) {
+        showToast(`[DEMO MODE] Verification OTP is: ${data.otp}`);
+        setOtpToken(data.otp);
+      } else {
+        showToast(`Account verification OTP generated. Check email/logs!`);
+      }
       setShowOtp(true);
     } catch (err) {
       setError(err.message);

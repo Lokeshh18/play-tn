@@ -15,32 +15,27 @@ const gallerySlides = [
   {
     img: "/images/cover_drive.webp",
     tag: "CRICKET",
-    title: "State T20 League Championship",
-    desc: "Elite club teams clash in Chennai for the final tournament cup."
+    position: "center 15%"
   },
   {
     img: "/images/bycycle.jpg",
     tag: "FOOTBALL",
-    title: "Tamil Nadu Football League Qualifier",
-    desc: "Top district squads compete for promotion in the state finals."
+    position: "center 20%"
   },
   {
     img: "/images/handball.jpg",
     tag: "HANDBALL",
-    title: "Salem Handball Invitational Cup",
-    desc: "Intense high-school and college tournament leagues showing local talent."
+    position: "center 20%"
   },
   {
     img: "/images/volleyball.jpeg",
     tag: "VOLLEYBALL",
-    title: "Coimbatore District Volleyball Open",
-    desc: "Fast-paced rallies in front of packed stadium crowds in Kovai."
+    position: "center 15%"
   },
   {
     img: "/images/badminton.webp",
     tag: "BADMINTON",
-    title: "Madurai Badminton Masters Singles",
-    desc: "Regional seeded players showcasing absolute agility and speed."
+    position: "center 15%"
   }
 ];
 
@@ -61,6 +56,16 @@ const sportMeta = {
   Basketball: { emoji: "🏀", color: "#d35400", bg: "linear-gradient(135deg,#e67e22,#d35400)" }
 };
 
+const SPORT_RULES = {
+  Cricket: { required: 11, substitutes: 5, isTeam: true },
+  Football: { required: 11, substitutes: 5, isTeam: true },
+  Basketball: { required: 5, substitutes: 5, isTeam: true },
+  Volleyball: { required: 6, substitutes: 6, isTeam: true },
+  Handball: { required: 7, substitutes: 7, isTeam: true },
+  Kabaddi: { required: 7, substitutes: 5, isTeam: true },
+  Badminton: { required: 1, substitutes: 0, isTeam: false }
+};
+
 export default function Home() {
   const [toast, setToast] = useState({ show: false, message: '' });
   const showToast = (message) => {
@@ -76,6 +81,84 @@ export default function Home() {
   const [selectedDistrict, setSelectedDistrict] = useState('Salem');
   const [selectedSport, setSelectedSport] = useState('Cricket');
   const [quickReg, setQuickReg] = useState({ name: '', phone: '', district: '', sport: '' });
+
+  // Registration modal states
+  const [registeringTournament, setRegisteringTournament] = useState(null);
+  const [teamRegForm, setTeamRegForm] = useState({
+    teamName: '',
+    captainName: '',
+    mobile: '',
+    accommodation: 'No',
+    players: [],
+    substitutes: []
+  });
+
+  // Pre-fill squads based on sport rules when modal opens
+  useEffect(() => {
+    if (registeringTournament) {
+      const rules = SPORT_RULES[registeringTournament.sport] || { required: 1, substitutes: 0, isTeam: false };
+      setTeamRegForm({
+        teamName: '',
+        captainName: currentUser?.name || '',
+        mobile: '',
+        accommodation: 'No',
+        players: Array(rules.required).fill(''),
+        substitutes: Array(rules.substitutes).fill('')
+      });
+    }
+  }, [registeringTournament, currentUser]);
+
+  const handleTeamRegistrationSubmit = async (e) => {
+    e.preventDefault();
+    if (!registeringTournament) return;
+
+    try {
+      // 1. Insert row in Supabase
+      const { data: regRow, error: regError } = await supabase
+        .from('tournament_registrations')
+        .insert([{
+          tournament_id: registeringTournament.id,
+          player_id: currentUser ? currentUser.id : null,
+          payment_status: 'FREE'
+        }])
+        .select()
+        .single();
+
+      if (regError) throw regError;
+
+      // 2. Save full details to local storage cache (so organizers can view details instantly)
+      const key = `local_team_registrations_${registeringTournament.id}`;
+      const existing = localStorage.getItem(key);
+      let list = [];
+      if (existing) {
+        try {
+          list = JSON.parse(existing);
+        } catch (e) {
+          list = [];
+        }
+      }
+      
+      const payload = {
+        id: regRow.id,
+        teamName: teamRegForm.teamName || 'Individual Player',
+        captainName: teamRegForm.captainName,
+        mobile: teamRegForm.mobile,
+        accommodation: teamRegForm.accommodation,
+        players: teamRegForm.players.filter(p => p.trim() !== ''),
+        substitutes: teamRegForm.substitutes.filter(s => s.trim() !== '')
+      };
+
+      list.push(payload);
+      localStorage.setItem(key, JSON.stringify(list));
+
+      showToast("Registration successfully submitted!");
+      setRegisteringTournament(null);
+
+    } catch (err) {
+      console.error(err);
+      showToast("Registration failed: " + err.message);
+    }
+  };
 
   // Slideshow States
   const [activeSlide, setActiveSlide] = useState(0);
@@ -120,7 +203,8 @@ export default function Home() {
           location: t.district,
           date: new Date(t.tournament_start).toLocaleDateString(),
           sport: t.sport,
-          emoji: sportMeta[t.sport]?.emoji || '🏆'
+          emoji: sportMeta[t.sport]?.emoji || '🏆',
+          posterUrl: t.poster_url || ''
         })));
       }
 
@@ -237,7 +321,7 @@ export default function Home() {
             <source src="/images/hero_video.mp4" type="video/mp4" />
           </video>
           <div className="position-absolute top-0 start-0 w-100 h-100" style={{
-            background: 'linear-gradient(to bottom, rgba(10,36,99,0.85) 0%, rgba(10,36,99,0.7) 100%)'
+            background: 'linear-gradient(to bottom, rgba(10,36,99,0.55) 0%, rgba(10,36,99,0.3) 100%)'
           }}></div>
         </div>
 
@@ -283,7 +367,17 @@ export default function Home() {
             <div className="row g-4" id="matchGrid">
               {matches.slice(0, matchesShown).map((m) => (
                 <div className="col-md-4" key={m.id}>
-                  <div className="card match-card shadow-sm h-100">
+                  <div className="card match-card shadow-sm h-100 border-0 overflow-hidden" style={{ background: '#fff' }}>
+                    {m.posterUrl && (
+                      <div className="w-100" style={{ height: '180px', overflow: 'hidden' }}>
+                        <img 
+                          src={m.posterUrl} 
+                          alt={m.title} 
+                          className="w-100 h-100 object-fit-cover transition-all"
+                          style={{ objectFit: 'cover' }}
+                        />
+                      </div>
+                    )}
                     <div className="card-header">{m.emoji} {m.title}</div>
                     <div className="card-body d-flex flex-column justify-content-between">
                       <p className="match-meta">
@@ -291,9 +385,13 @@ export default function Home() {
                         📅 {m.date}<br />
                         <span className="sport-badge">{m.sport}</span>
                       </p>
-                      <Link href={`/register`} className="btn-register mt-2 w-100 text-center text-decoration-none">
+                      <button 
+                        onClick={() => setRegisteringTournament(m)}
+                        className="btn-register mt-2 w-100 text-center border-0 py-2 fw-semibold text-white text-decoration-none rounded-pill"
+                        style={{ background: 'var(--blue)' }}
+                      >
                         Register Now
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -528,9 +626,9 @@ export default function Home() {
                 key={idx}
                 className="position-absolute w-100 h-100 transition-all"
                 style={{
-                  backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.8)), url(${slide.img})`,
+                  backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.5)), url(${slide.img})`,
                   backgroundSize: 'cover',
-                  backgroundPosition: 'center',
+                  backgroundPosition: slide.position || 'center',
                   opacity: activeSlide === idx ? 1 : 0,
                   visibility: activeSlide === idx ? 'visible' : 'hidden',
                   transition: 'opacity 0.8s ease-in-out',
@@ -538,11 +636,18 @@ export default function Home() {
                 }}
               >
                 <div className="position-absolute bottom-0 start-0 p-4 p-md-5 text-white">
-                  <span className="badge bg-warning text-dark rounded-pill mb-2 px-3 py-2 small fw-bold" style={{ letterSpacing: '1px' }}>
+                  <span 
+                    className="rounded-pill mb-2 px-4 py-2 fw-bold d-inline-block shadow-sm" 
+                    style={{ 
+                      letterSpacing: '2px', 
+                      fontSize: '1.1rem',
+                      background: 'linear-gradient(135deg, #f5f6f8, #e2e5e9)',
+                      color: '#000',
+                      border: '1px solid rgba(255,255,255,0.4)'
+                    }}
+                  >
                     {slide.tag}
                   </span>
-                  <h3 className="fw-bold fs-2 text-white">{slide.title}</h3>
-                  <p className="m-0 text-white-50">{slide.desc}</p>
                 </div>
               </div>
             ))}
@@ -627,6 +732,145 @@ export default function Home() {
           <p className="mt-1" style={{ fontSize: '.78rem' }}>&copy; 2026 Play TN &mdash; Web Portfolio Project</p>
         </div>
       </footer>
+
+      {/* TOURNAMENT REGISTRATION MODAL */}
+      {registeringTournament && (() => {
+        const rules = SPORT_RULES[registeringTournament.sport] || { required: 1, substitutes: 0, isTeam: false };
+        return (
+          <div className="modal fade show d-block animate-fade-in" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+            <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+              <div className="modal-content rounded-4 border-0 shadow-lg" style={{ maxHeight: '85vh' }}>
+                <div className="modal-header border-0 bg-navy text-white p-4">
+                  <h5 className="modal-title fw-bold">Register for {registeringTournament.title}</h5>
+                  <button 
+                    type="button" className="btn-close btn-close-white" 
+                    onClick={() => setRegisteringTournament(null)}
+                  ></button>
+                </div>
+                <form onSubmit={handleTeamRegistrationSubmit}>
+                  <div className="modal-body p-4 bg-light" style={{ maxHeight: 'calc(85vh - 160px)', overflowY: 'auto' }}>
+                    <div className="row g-3">
+                      {rules.isTeam ? (
+                        <>
+                          <div className="col-md-6">
+                            <label className="form-label small fw-bold">Team Name</label>
+                            <input 
+                              type="text" className="form-control" placeholder="e.g. Salem Strikers"
+                              value={teamRegForm.teamName}
+                              onChange={(e) => setTeamRegForm({ ...teamRegForm, teamName: e.target.value })}
+                              required 
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label small fw-bold">Captain Name</label>
+                            <input 
+                              type="text" className="form-control" placeholder="e.g. John Doe"
+                              value={teamRegForm.captainName}
+                              onChange={(e) => setTeamRegForm({ ...teamRegForm, captainName: e.target.value })}
+                              required 
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="col-md-12">
+                          <label className="form-label small fw-bold">Player Name</label>
+                          <input 
+                            type="text" className="form-control" placeholder="e.g. Jane Doe"
+                            value={teamRegForm.captainName}
+                            onChange={(e) => setTeamRegForm({ ...teamRegForm, captainName: e.target.value })}
+                            required 
+                          />
+                        </div>
+                      )}
+
+                      <div className="col-md-6">
+                        <label className="form-label small fw-bold">Contact Mobile Number</label>
+                        <input 
+                          type="tel" className="form-control" placeholder="+91 XXXXX XXXXX"
+                          value={teamRegForm.mobile}
+                          onChange={(e) => setTeamRegForm({ ...teamRegForm, mobile: e.target.value })}
+                          required 
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-bold">Accommodation Needed?</label>
+                        <select 
+                          className="form-select"
+                          value={teamRegForm.accommodation}
+                          onChange={(e) => setTeamRegForm({ ...teamRegForm, accommodation: e.target.value })}
+                          required
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                      </div>
+
+                      {rules.isTeam && (
+                        <div className="col-12 mt-4">
+                          <hr />
+                          <h6 className="fw-bold text-navy mb-3">Playing Members List (Squad of {rules.required})</h6>
+                          <div className="row g-2">
+                            {teamRegForm.players.map((p, idx) => (
+                              <div key={idx} className="col-md-6">
+                                <label className="form-label text-muted small mb-1">Player {idx + 1} {idx === 0 ? '(Captain)' : ''}</label>
+                                <input 
+                                  type="text" className="form-control form-control-sm"
+                                  placeholder={`Player ${idx + 1} Name`}
+                                  value={p}
+                                  onChange={(e) => {
+                                    const updated = [...teamRegForm.players];
+                                    updated[idx] = e.target.value;
+                                    setTeamRegForm({ ...teamRegForm, players: updated });
+                                  }}
+                                  required 
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {rules.isTeam && rules.substitutes > 0 && (
+                        <div className="col-12 mt-4">
+                          <h6 className="fw-bold text-navy mb-3">Substitutes List (Max {rules.substitutes} - Optional)</h6>
+                          <div className="row g-2">
+                            {teamRegForm.substitutes.map((s, idx) => (
+                              <div key={idx} className="col-md-6">
+                                <label className="form-label text-muted small mb-1">Substitute {idx + 1}</label>
+                                <input 
+                                  type="text" className="form-control form-control-sm"
+                                  placeholder={`Substitute ${idx + 1} Name`}
+                                  value={s}
+                                  onChange={(e) => {
+                                    const updated = [...teamRegForm.substitutes];
+                                    updated[idx] = e.target.value;
+                                    setTeamRegForm({ ...teamRegForm, substitutes: updated });
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="modal-footer border-0 p-3 bg-light d-flex justify-content-end gap-2">
+                    <button 
+                      type="button" className="btn btn-secondary rounded-pill px-4" 
+                      onClick={() => setRegisteringTournament(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary rounded-pill px-4 fw-bold">
+                      {rules.isTeam ? 'Register the Team' : 'Register Player'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* TOAST MESSAGE */}
       {toast.show && (

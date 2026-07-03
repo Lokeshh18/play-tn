@@ -110,7 +110,12 @@ export default function Login() {
         throw new Error(data.error || 'Failed to submit reset request');
       }
 
-      showToast("OTP verification token generated! Check server logs.");
+      if (data.otp) {
+        showToast(`[DEMO MODE] Password Reset OTP is: ${data.otp}`);
+        setResetOtp(data.otp);
+      } else {
+        showToast("OTP verification token generated! Check server logs.");
+      }
       setShowResetView(true);
     } catch (err) {
       setError(err.message);
