@@ -15,6 +15,20 @@ export default function Login() {
   const [otpCode, setOtpCode] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
 
+  // Forgot/Reset Password States
+  const [forgotView, setForgotView] = useState(false);
+  const [showResetView, setShowResetView] = useState(false);
+  const [resetOtp, setResetOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: '' });
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 4000);
+  };
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -78,6 +92,64 @@ export default function Login() {
     }
   };
 
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'forgot-password', email })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit reset request');
+      }
+
+      showToast("OTP verification token generated! Check server logs.");
+      setShowResetView(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset-password', email, otp: resetOtp, password: newPassword })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Reset failed');
+      }
+
+      showToast("Password has been reset successfully! You can now sign in.");
+      setForgotView(false);
+      setShowResetView(false);
+      setPassword('');
+      setResetOtp('');
+      setNewPassword('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -97,10 +169,12 @@ export default function Login() {
         }}>
           <div className="card-body p-4 p-md-5 bg-white">
             <div className="text-center mb-4">
-              <Link href="/" className="navbar-brand fs-1 text-decoration-none" style={{ color: 'var(--navy)', fontFamily: 'Bebas Neue', letterSpacing: '3px' }}>
+              <Link href="/" className="fs-1 text-decoration-none fw-bold" style={{ color: 'var(--blue)', fontFamily: 'Bebas Neue', letterSpacing: '3px' }}>
                 PLAY<span style={{ color: 'var(--gold)' }}>TN</span>
               </Link>
-              <h5 className="fw-bold mt-2" style={{ color: 'var(--navy)' }}>Sign In to Your Account</h5>
+              <h5 className="fw-bold mt-2" style={{ color: 'var(--navy)' }}>
+                {forgotView ? 'Reset Your Password' : 'Sign In to Your Account'}
+              </h5>
             </div>
 
             {error && (
@@ -109,96 +183,159 @@ export default function Login() {
               </div>
             )}
 
-            {!showOtpModal ? (
-              <form onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <label className="form-label text-navy">Email Address</label>
-                  <input
-                    type="email"
-                    className="form-control py-2"
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
+            {/* FORGOT PASSWORD SECTION */}
+            {forgotView ? (
+              !showResetView ? (
+                <form onSubmit={handleForgotSubmit}>
+                  <p className="small text-muted mb-4">Enter your registered email address to request a verification OTP.</p>
+                  <div className="mb-4">
+                    <label className="form-label text-navy">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-control py-2"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                <div className="mb-4">
-                  <label className="form-label text-navy">Password</label>
-                  <input
-                    type="password"
-                    className="form-control py-2"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
+                  <button type="submit" className="btn-submit py-2 w-100" disabled={loading}>
+                    {loading ? 'Submitting...' : 'Send Verification OTP'}
+                  </button>
 
-                <button 
-                  type="submit" 
-                  className="btn-submit py-2 w-100" 
-                  disabled={loading}
-                >
-                  {loading ? 'Signing In...' : 'Sign In'}
-                </button>
-              </form>
+                  <div className="text-center mt-3">
+                    <button type="button" onClick={() => setForgotView(false)} className="btn btn-link text-decoration-none btn-sm fw-bold" style={{ color: 'var(--muted)' }}>
+                      &larr; Back to Login
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleResetSubmit}>
+                  <div className="mb-3">
+                    <label className="form-label text-navy">6-Digit Verification OTP</label>
+                    <input
+                      type="text"
+                      maxLength="6"
+                      className="form-control text-center py-2 fw-bold tracking-widest fs-5"
+                      placeholder="000000"
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label text-navy">New Password</label>
+                    <input
+                      type="password"
+                      className="form-control py-2"
+                      placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button type="submit" className="btn-submit py-2 w-100" disabled={loading}>
+                    {loading ? 'Resetting Password...' : 'Verify & Reset Password'}
+                  </button>
+                </form>
+              )
             ) : (
-              <form onSubmit={handleOtpSubmit}>
-                <div className="mb-4 text-center">
-                  <p className="small text-muted">Please enter verification OTP. If reviewing this project, use the fallback code <strong>123456</strong>.</p>
-                  <input
-                    type="text"
-                    maxLength="6"
-                    className="form-control text-center fs-3 fw-bold tracking-widest py-2"
-                    placeholder="000000"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    required
-                  />
-                </div>
+              /* LOGIN & OTP SECTIONS */
+              !showOtpModal ? (
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-3">
+                    <label className="form-label text-navy">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-control py-2"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                <button 
-                  type="submit" 
-                  className="btn-submit py-2 w-100" 
-                  disabled={loading}
-                >
-                  {loading ? 'Verifying...' : 'Verify & Sign In'}
-                </button>
-              </form>
+                  <div className="mb-3">
+                    <div className="d-flex justify-content-between">
+                      <label className="form-label text-navy">Password</label>
+                      <button type="button" onClick={() => setForgotView(true)} className="btn btn-link p-0 text-decoration-none btn-sm fw-bold border-0 bg-transparent" style={{ color: 'var(--accent)', fontSize: '.83rem' }}>
+                        Forgot Password?
+                      </button>
+                    </div>
+                    <input
+                      type="password"
+                      className="form-control py-2"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn-submit py-2 w-100" 
+                    disabled={loading}
+                  >
+                    {loading ? 'Signing In...' : 'Sign In'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleOtpSubmit}>
+                  <div className="mb-4 text-center">
+                    <p className="small text-muted">Please enter verification OTP sent to your email/logs.</p>
+                    <input
+                      type="text"
+                      maxLength="6"
+                      className="form-control text-center fs-3 fw-bold tracking-widest py-2"
+                      placeholder="000000"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn-submit py-2 w-100" 
+                    disabled={loading}
+                  >
+                    {loading ? 'Verifying...' : 'Verify & Sign In'}
+                  </button>
+                </form>
+              )
             )}
 
-            <div className="text-center mt-4">
-              <span className="small text-muted">Don&apos;t have an account? </span>
-              <Link href="/register" className="small text-decoration-none fw-bold" style={{ color: 'var(--accent)' }}>
-                Register Here
-              </Link>
-            </div>
-
-            {/* Recruiter Credentials Cheat Sheet */}
-            <div className="mt-4 p-3 rounded-3" style={{ background: '#f0f6ff', border: '1px solid #c8daf5' }}>
-              <h6 className="fw-bold mb-2 text-center" style={{ color: 'var(--navy)', fontSize: '.82rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                🔑 Quick Demo Credentials
-              </h6>
-              <div className="small" style={{ fontSize: '.75rem', color: 'var(--text)' }}>
-                <div className="d-flex justify-content-between mb-1">
-                  <span><strong>Player:</strong> player@playtn.in</span>
-                  <span className="text-muted">pass: password</span>
-                </div>
-                <div className="d-flex justify-content-between mb-1">
-                  <span><strong>Organizer:</strong> organiser@playtn.in</span>
-                  <span className="text-muted">pass: password</span>
-                </div>
-                <div className="d-flex justify-content-between">
-                  <span><strong>Admin:</strong> admin@playtn.in</span>
-                  <span className="text-muted">pass: password</span>
-                </div>
+            {!forgotView && (
+              <div className="text-center mt-4">
+                <span className="small text-muted">Don&apos;t have an account? </span>
+                <Link href="/register" className="small text-decoration-none fw-bold" style={{ color: 'var(--accent)' }}>
+                  Register Here
+                </Link>
               </div>
-            </div>
+            )}
 
           </div>
         </div>
       </div>
+
+      {/* TOAST MESSAGE */}
+      {toast.show && (
+        <div className="position-fixed bottom-0 end-0 m-4 p-3 rounded-4 shadow-lg text-white" style={{
+          background: 'var(--navy)',
+          borderLeft: '5px solid var(--gold)',
+          zIndex: 1050,
+          animation: 'fadeInUp 0.3s ease-out'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <span>🎉</span>
+            <span className="fw-semibold">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </>
   );
 }

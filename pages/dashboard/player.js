@@ -2,28 +2,48 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { supabase } from '../../lib/supabaseClient';
+
+const TAMIL_NADU_DISTRICTS = [
+  "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri", "Dindigul", "Erode", 
+  "Kallakurichi", "Kanchipuram", "Kanyakumari", "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", 
+  "Nagapattinam", "Namakkal", "Nilgiris", "Perambalur", "Pudukkottai", "Ramanathapuram", "Ranipet", 
+  "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "Theni", "Thoothukudi", "Tiruchirappalli", "Tirunelveli", 
+  "Tirupathur", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur", "Vellore", "Viluppuram", "Virudhunagar"
+];
+
 
 export default function PlayerDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [registrations, setRegistrations] = useState([]);
+  const [performance, setPerformance] = useState({ rank: 'N/A', matches: 0, points: 0 });
   
-  // Player state details
   const [profile, setProfile] = useState({
-    age: '24',
-    dob: '2002-04-12',
+    age: '',
+    dob: '',
     gender: 'Male',
-    district: 'Salem',
-    address: '12 Main Street, Salem, TN',
+    district: '',
+    address: '',
     preferredSport: 'Cricket',
-    experience: 'Intermediate',
-    bio: 'Cricket enthusiast, right-handed batsman.',
-    achievements: 'Winner of Salem District League 2025'
+    experience: '',
+    bio: '',
+    achievements: ''
   });
 
   const [editing, setEditing] = useState(false);
   const [updatedProfile, setUpdatedProfile] = useState({ ...profile });
 
+  // Toast Notification State
+  const [toast, setToast] = useState({ show: false, message: '' });
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 4000);
+  };
+
+
+  // Auth check
   useEffect(() => {
     const session = localStorage.getItem('userSession');
     if (!session) {
@@ -38,22 +58,119 @@ export default function PlayerDashboard() {
     }
 
     setUser(userData);
-    setLoading(false);
   }, [router]);
+
+  // Load database entries
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadPlayerData() {
+      // 1. Fetch Profile
+      const { data: profileData } = await supabase
+        .from('player_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileData) {
+        const mapped = {
+          age: profileData.age || '',
+          dob: profileData.dob || '',
+          gender: profileData.gender || 'Male',
+          district: profileData.district || '',
+          address: profileData.address || '',
+          preferredSport: profileData.preferred_sport || 'Cricket',
+          experience: profileData.experience || '',
+          bio: profileData.bio || '',
+          achievements: profileData.achievements || ''
+        };
+        setProfile(mapped);
+        setUpdatedProfile(mapped);
+
+        // Auto-enable edit mode if player details are uncompleted/empty
+        if (!profileData.district || !profileData.age) {
+          setEditing(true);
+        }
+      } else {
+        // Force edit mode for new users with no profile record at all
+        setEditing(true);
+      }
+
+      // 2. Fetch Registrations
+      const { data: regsData } = await supabase
+        .from('tournament_registrations')
+        .select('*, tournaments(*)')
+        .eq('player_id', user.id);
+
+      if (regsData) {
+        setRegistrations(regsData);
+      }
+
+      // 3. Fetch Leaderboard Performance metrics
+      const { data: perfData } = await supabase
+        .from('leaderboards')
+        .select('*')
+        .eq('player_id', user.id)
+        .maybeSingle();
+
+      if (perfData) {
+        // Find state rank
+        const { count: rankCount } = await supabase
+          .from('leaderboards')
+          .select('id', { count: 'exact', head: true })
+          .gt('points', perfData.points);
+
+        setPerformance({
+          rank: `#${(rankCount || 0) + 1}`,
+          matches: perfData.matches_played || 0,
+          points: perfData.points || 0
+        });
+      }
+
+      setLoading(false);
+    }
+
+    loadPlayerData();
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem('userSession');
     router.push('/login');
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setProfile(updatedProfile);
-    setEditing(false);
-    alert("Profile details updated successfully!");
+    setLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('player_profiles')
+        .upsert({
+          id: user.id,
+          age: parseInt(updatedProfile.age) || null,
+          dob: updatedProfile.dob || null,
+          gender: updatedProfile.gender,
+          district: updatedProfile.district,
+          address: updatedProfile.address,
+          preferred_sport: updatedProfile.preferredSport,
+          experience: updatedProfile.experience,
+          bio: updatedProfile.bio,
+          achievements: updatedProfile.achievements
+        });
+
+      if (error) throw error;
+
+      setProfile(updatedProfile);
+      setEditing(false);
+      showToast("Profile details updated successfully!");
+    } catch (err) {
+      showToast("Error saving profile details: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
+  if (loading && !user) {
     return (
       <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light">
         <div className="spinner-border text-primary" role="status">
@@ -76,7 +193,7 @@ export default function PlayerDashboard() {
             PLAY<span>TN</span>
           </Link>
           <div className="ms-auto d-flex align-items-center gap-3">
-            <span className="text-white small d-none d-md-inline">Welcome, <strong>{user.name}</strong></span>
+            <span className="text-white small d-none d-md-inline">Welcome, <strong>{user?.name}</strong></span>
             <button onClick={handleLogout} className="btn btn-outline-warning rounded-pill btn-sm px-3">
               Logout
             </button>
@@ -93,20 +210,20 @@ export default function PlayerDashboard() {
             <div className="card shadow-sm border-0 rounded-4 p-4 text-center bg-white">
               <div className="position-relative d-inline-block mx-auto mb-3" style={{ width: '120px', height: '120px' }}>
                 <div className="rounded-circle bg-navy d-flex align-items-center justify-content-center text-white fw-bold fs-1 w-100 h-100">
-                  {user.name.charAt(0)}
+                  {user?.name?.charAt(0)}
                 </div>
               </div>
-              <h4 className="fw-bold text-navy mb-1">{user.name}</h4>
+              <h4 className="fw-bold text-navy mb-1">{user?.name}</h4>
               <span className="badge bg-primary rounded-pill mb-3" style={{ fontSize: '.75rem', letterSpacing: '1px' }}>
                 ATHLETE / PLAYER
               </span>
-              <p className="small text-muted">{user.email}</p>
+              <p className="small text-muted">{user?.email}</p>
               <hr />
               <div className="text-start">
-                <p className="small mb-2"><strong>Preferred Sport:</strong> {profile.preferredSport}</p>
-                <p className="small mb-2"><strong>District:</strong> {profile.district}</p>
-                <p className="small mb-2"><strong>Experience:</strong> {profile.experience}</p>
-                <p className="small mb-0"><strong>Achievements:</strong> {profile.achievements || 'None yet'}</p>
+                <p className="small mb-2"><strong>Preferred Sport:</strong> {profile.preferredSport || 'Not set'}</p>
+                <p className="small mb-2"><strong>District:</strong> {profile.district || 'Not set'}</p>
+                <p className="small mb-2"><strong>Experience:</strong> {profile.experience || 'Not set'}</p>
+                <p className="small mb-0"><strong>Achievements:</strong> {profile.achievements || 'None recorded yet'}</p>
               </div>
               <button 
                 onClick={() => { setEditing(!editing); setUpdatedProfile({ ...profile }); }}
@@ -152,23 +269,31 @@ export default function PlayerDashboard() {
                         className="form-select"
                         value={updatedProfile.preferredSport}
                         onChange={(e) => setUpdatedProfile({ ...updatedProfile, preferredSport: e.target.value })}
+                        required
                       >
+                        <option value="">Select Sport</option>
                         <option>Cricket</option>
                         <option>Football</option>
                         <option>Volleyball</option>
                         <option>Kabaddi</option>
                         <option>Badminton</option>
+                        <option>Handball</option>
+                        <option>Basketball</option>
                       </select>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label small fw-bold">District</label>
-                      <input 
-                        type="text" 
-                        className="form-control"
+                      <select 
+                        className="form-select"
                         value={updatedProfile.district}
                         onChange={(e) => setUpdatedProfile({ ...updatedProfile, district: e.target.value })}
-                        required 
-                      />
+                        required
+                      >
+                        <option value="">Select District</option>
+                        {TAMIL_NADU_DISTRICTS.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="col-12">
                       <label className="form-label small fw-bold">Bio</label>
@@ -199,30 +324,36 @@ export default function PlayerDashboard() {
                 <div className="card shadow-sm border-0 rounded-4 p-4 bg-white">
                   <h5 className="fw-bold text-navy mb-3">Registered Tournaments</h5>
                   <div className="table-responsive">
-                    <table className="table align-middle">
-                      <thead>
-                        <tr>
-                          <th>Tournament</th>
-                          <th>Sport</th>
-                          <th>Schedule Date</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td><strong>District Cricket Cup</strong></td>
-                          <td>Cricket</td>
-                          <td>10 Jun 2026</td>
-                          <td><span className="badge bg-success rounded-pill">Active / Confirmed</span></td>
-                        </tr>
-                        <tr>
-                          <td><strong>State Kabaddi Open</strong></td>
-                          <td>Kabaddi</td>
-                          <td>18 Jun 2026</td>
-                          <td><span className="badge bg-warning rounded-pill">Pending Approval</span></td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    {registrations.length === 0 ? (
+                      <p className="text-muted small m-0 p-3 text-center">You haven&apos;t registered for any tournaments yet.</p>
+                    ) : (
+                      <table className="table align-middle">
+                        <thead>
+                          <tr>
+                            <th>Tournament</th>
+                            <th>Sport</th>
+                            <th>Schedule Date</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {registrations.map(reg => (
+                            <tr key={reg.id}>
+                              <td><strong>{reg.tournaments?.name}</strong></td>
+                              <td>{reg.tournaments?.sport}</td>
+                              <td>{new Date(reg.tournaments?.tournament_start).toLocaleDateString()}</td>
+                              <td>
+                                <span className={`badge rounded-pill ${
+                                  reg.payment_status === 'PAID' || reg.payment_status === 'FREE' ? 'bg-success' : 'bg-warning text-dark'
+                                }`}>
+                                  {reg.payment_status === 'PAID' || reg.payment_status === 'FREE' ? 'Confirmed' : 'Pending Payment'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 </div>
 
@@ -233,19 +364,19 @@ export default function PlayerDashboard() {
                     <div className="col-sm-4">
                       <div className="p-3 bg-light rounded-3 text-center">
                         <span className="text-muted d-block small mb-1">State Rank</span>
-                        <h4 className="fw-bold text-navy m-0">#42</h4>
+                        <h4 className="fw-bold text-navy m-0">{performance.rank}</h4>
                       </div>
                     </div>
                     <div className="col-sm-4">
                       <div className="p-3 bg-light rounded-3 text-center">
                         <span className="text-muted d-block small mb-1">Matches Played</span>
-                        <h4 className="fw-bold text-navy m-0">15</h4>
+                        <h4 className="fw-bold text-navy m-0">{performance.matches}</h4>
                       </div>
                     </div>
                     <div className="col-sm-4">
                       <div className="p-3 bg-light rounded-3 text-center">
                         <span className="text-muted d-block small mb-1">Total Points</span>
-                        <h4 className="fw-bold text-navy m-0">310</h4>
+                        <h4 className="fw-bold text-navy m-0">{performance.points}</h4>
                       </div>
                     </div>
                   </div>
@@ -257,6 +388,21 @@ export default function PlayerDashboard() {
 
         </div>
       </div>
+
+      {/* TOAST MESSAGE */}
+      {toast.show && (
+        <div className="position-fixed bottom-0 end-0 m-4 p-3 rounded-4 shadow-lg text-white" style={{
+          background: 'var(--navy)',
+          borderLeft: '5px solid var(--gold)',
+          zIndex: 1050,
+          animation: 'fadeInUp 0.3s ease-out'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <span>🎉</span>
+            <span className="fw-semibold">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </>
   );
 }

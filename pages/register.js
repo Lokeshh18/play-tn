@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 
 export default function Register() {
   const router = useRouter();
-  const [role, setRole] = useState('PLAYER'); // 'PLAYER', 'COACH', 'ORGANISER'
+  const [role, setRole] = useState('PLAYER'); // 'PLAYER', 'ORGANISER', 'ADMIN'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +16,14 @@ export default function Register() {
   const [otpToken, setOtpToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Toast state
+  const [toast, setToast] = useState({ show: false, message: '' });
+
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 4000);
+  };
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +43,7 @@ export default function Register() {
         throw new Error(data.error || 'Registration failed');
       }
 
-      // Proceed to OTP verification view
+      showToast(`Account verification OTP generated. Check email/logs!`);
       setShowOtp(true);
     } catch (err) {
       setError(err.message);
@@ -62,9 +70,14 @@ export default function Register() {
         throw new Error(data.error || 'Verification failed');
       }
 
-      // Success, save session and forward to dashboard
+      showToast(`Account successfully verified! Logging in...`);
       localStorage.setItem('userSession', JSON.stringify(data.user));
-      router.push(`/dashboard/${data.user.role.toLowerCase()}`);
+      
+      // Wait a moment for the toast to display, then route
+      setTimeout(() => {
+        router.push(`/dashboard/${data.user.role.toLowerCase()}`);
+      }, 1500);
+      
     } catch (err) {
       setError(err.message);
     } finally {
@@ -77,6 +90,21 @@ export default function Register() {
       <Head>
         <title>Register Account &mdash; Play TN</title>
       </Head>
+
+      {/* TOAST MESSAGE */}
+      {toast.show && (
+        <div className="position-fixed bottom-0 end-0 m-4 p-3 rounded-4 shadow-lg text-white" style={{
+          background: 'var(--navy)',
+          borderLeft: '5px solid var(--gold)',
+          zIndex: 1050,
+          animation: 'fadeInUp 0.3s ease-out'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <span>🎉</span>
+            <span className="fw-semibold">{toast.message}</span>
+          </div>
+        </div>
+      )}
 
       <div className="d-flex align-items-center justify-content-center min-vh-100" style={{
         background: 'linear-gradient(135deg, var(--navy) 0%, #0d3b9e 50%, var(--blue) 100%)',
@@ -91,7 +119,7 @@ export default function Register() {
         }}>
           <div className="card-body p-4 p-md-5 bg-white">
             <div className="text-center mb-4">
-              <Link href="/" className="navbar-brand fs-1 text-decoration-none" style={{ color: 'var(--navy)', fontFamily: 'Bebas Neue', letterSpacing: '3px' }}>
+              <Link href="/" className="fs-1 text-decoration-none fw-bold" style={{ color: 'var(--blue)', fontFamily: 'Bebas Neue', letterSpacing: '3px' }}>
                 PLAY<span style={{ color: 'var(--gold)' }}>TN</span>
               </Link>
               <h5 className="fw-bold mt-2" style={{ color: 'var(--navy)' }}>Create Your Account</h5>
@@ -107,7 +135,7 @@ export default function Register() {
               <form onSubmit={handleRegisterSubmit}>
                 {/* Role Tabs */}
                 <div className="d-flex gap-2 p-1 bg-light rounded-4 mb-4" style={{ border: '1px solid #e0eaf8' }}>
-                  {['PLAYER', 'COACH', 'ORGANISER'].map((r) => (
+                  {['PLAYER', 'ORGANISER'].map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -179,9 +207,7 @@ export default function Register() {
             ) : (
               <form onSubmit={handleOtpVerify}>
                 <div className="mb-4 text-center">
-                  <h6 className="fw-bold mb-1" style={{ color: 'var(--navy)' }}>OTP Sent to Console logs</h6>
-                  <p className="small text-muted mb-4">Please input the OTP generated for <strong>{email}</strong>. For demonstration bypass, use: <strong>123456</strong>.</p>
-                  
+                  <p className="small text-muted">Verify your signup. Check your email or console logs for the 6-digit OTP code.</p>
                   <input
                     type="text"
                     maxLength="6"
@@ -198,7 +224,7 @@ export default function Register() {
                   className="btn-submit py-2 w-100" 
                   disabled={loading}
                 >
-                  {loading ? 'Verifying OTP...' : 'Verify Email & Complete Sign Up'}
+                  {loading ? 'Verifying...' : 'Verify & Sign In'}
                 </button>
               </form>
             )}
@@ -206,19 +232,13 @@ export default function Register() {
             <div className="text-center mt-4">
               <span className="small text-muted">Already have an account? </span>
               <Link href="/login" className="small text-decoration-none fw-bold" style={{ color: 'var(--accent)' }}>
-                Sign In
+                Sign In Instead
               </Link>
             </div>
 
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        .bg-navy {
-          background-color: var(--navy) !important;
-        }
-      `}</style>
     </>
   );
 }
