@@ -12,7 +12,6 @@ const TAMIL_NADU_DISTRICTS = [
   "Tirupathur", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur", "Vellore", "Viluppuram", "Virudhunagar"
 ];
 
-
 export default function PlayerDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -27,9 +26,9 @@ export default function PlayerDashboard() {
     district: '',
     address: '',
     preferredSport: 'Cricket',
-    experience: '',
     bio: '',
-    achievements: ''
+    achievements: '',
+    profilePic: ''
   });
 
   const [editing, setEditing] = useState(false);
@@ -41,7 +40,6 @@ export default function PlayerDashboard() {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: '' }), 4000);
   };
-
 
   // Auth check
   useEffect(() => {
@@ -80,9 +78,9 @@ export default function PlayerDashboard() {
           district: profileData.district || '',
           address: profileData.address || '',
           preferredSport: profileData.preferred_sport || 'Cricket',
-          experience: profileData.experience || '',
           bio: profileData.bio || '',
-          achievements: profileData.achievements || ''
+          achievements: profileData.achievements || '',
+          profilePic: profileData.profile_pic || ''
         };
         setProfile(mapped);
         setUpdatedProfile(mapped);
@@ -138,6 +136,59 @@ export default function PlayerDashboard() {
     router.push('/login');
   };
 
+  const handleProfilePicChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check size limit: keep base64/upload sizes small (e.g. < 1.5MB)
+    if (file.size > 1500000) {
+      showToast("Profile photo must be less than 1.5MB");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Upload file to Supabase storage bucket 'profile-pics'
+      const { error: uploadError } = await supabase.storage
+        .from('profile-pics')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        // Fall back to base64 if storage bucket is not configured
+        console.warn("Storage upload failed, falling back to Base64:", uploadError.message);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setUpdatedProfile(prev => ({
+            ...prev,
+            profilePic: reader.result
+          }));
+          showToast("Photo loaded locally. Save profile to update!");
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Get public URL
+        const { data } = supabase.storage
+          .from('profile-pics')
+          .getPublicUrl(filePath);
+
+        setUpdatedProfile(prev => ({
+          ...prev,
+          profilePic: data.publicUrl
+        }));
+        showToast("Profile photo uploaded successfully!");
+      }
+    } catch (err) {
+      console.error("Photo upload error:", err);
+      showToast("Photo upload failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -153,9 +204,9 @@ export default function PlayerDashboard() {
           district: updatedProfile.district,
           address: updatedProfile.address,
           preferred_sport: updatedProfile.preferredSport,
-          experience: updatedProfile.experience,
           bio: updatedProfile.bio,
-          achievements: updatedProfile.achievements
+          achievements: updatedProfile.achievements,
+          profile_pic: updatedProfile.profilePic
         });
 
       if (error) throw error;
@@ -201,6 +252,21 @@ export default function PlayerDashboard() {
         </div>
       </nav>
 
+      {/* TOAST MESSAGE */}
+      {toast.show && (
+        <div className="position-fixed bottom-0 end-0 m-4 p-3 rounded-4 shadow-lg text-white" style={{
+          background: 'var(--navy)',
+          borderLeft: '5px solid var(--gold)',
+          zIndex: 1050,
+          animation: 'fadeInUp 0.3s ease-out'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <span>🎉</span>
+            <span className="fw-semibold">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* MAIN CONTENT */}
       <div className="container py-5">
         <div className="row g-4">
@@ -209,9 +275,18 @@ export default function PlayerDashboard() {
           <div className="col-lg-4">
             <div className="card shadow-sm border-0 rounded-4 p-4 text-center bg-white">
               <div className="position-relative d-inline-block mx-auto mb-3" style={{ width: '120px', height: '120px' }}>
-                <div className="rounded-circle bg-navy d-flex align-items-center justify-content-center text-white fw-bold fs-1 w-100 h-100">
-                  {user?.name?.charAt(0)}
-                </div>
+                {profile.profilePic ? (
+                  <img 
+                    src={profile.profilePic} 
+                    alt="Profile" 
+                    className="rounded-circle w-100 h-100 object-fit-cover shadow"
+                    style={{ border: '3px solid var(--blue)' }}
+                  />
+                ) : (
+                  <div className="rounded-circle bg-navy d-flex align-items-center justify-content-center text-white fw-bold fs-1 w-100 h-100">
+                    {user?.name?.charAt(0)}
+                  </div>
+                )}
               </div>
               <h4 className="fw-bold text-navy mb-1">{user?.name}</h4>
               <span className="badge bg-primary rounded-pill mb-3" style={{ fontSize: '.75rem', letterSpacing: '1px' }}>
@@ -222,7 +297,6 @@ export default function PlayerDashboard() {
               <div className="text-start">
                 <p className="small mb-2"><strong>Preferred Sport:</strong> {profile.preferredSport || 'Not set'}</p>
                 <p className="small mb-2"><strong>District:</strong> {profile.district || 'Not set'}</p>
-                <p className="small mb-2"><strong>Experience:</strong> {profile.experience || 'Not set'}</p>
                 <p className="small mb-0"><strong>Achievements:</strong> {profile.achievements || 'None recorded yet'}</p>
               </div>
               <button 
@@ -241,6 +315,31 @@ export default function PlayerDashboard() {
                 <h5 className="fw-bold text-navy mb-4">Edit Profile Information</h5>
                 <form onSubmit={handleSaveProfile}>
                   <div className="row g-3">
+                    <div className="col-12 text-center mb-3">
+                      <div className="position-relative d-inline-block mx-auto mb-2" style={{ width: '100px', height: '100px' }}>
+                        {updatedProfile.profilePic ? (
+                          <img 
+                            src={updatedProfile.profilePic} 
+                            alt="Preview" 
+                            className="rounded-circle w-100 h-100 object-fit-cover shadow"
+                          />
+                        ) : (
+                          <div className="rounded-circle bg-light border d-flex align-items-center justify-content-center text-muted w-100 h-100 fs-4">
+                            📷
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-md-6 mx-auto">
+                        <label className="form-label small fw-bold">Upload Profile Photo</label>
+                        <input 
+                          type="file" 
+                          className="form-control form-control-sm"
+                          accept="image/*"
+                          onChange={handleProfilePicChange}
+                        />
+                      </div>
+                    </div>
+
                     <div className="col-md-6">
                       <label className="form-label small fw-bold">Age</label>
                       <input 
@@ -359,7 +458,7 @@ export default function PlayerDashboard() {
 
                 {/* MY PERFORMANCE */}
                 <div className="card shadow-sm border-0 rounded-4 p-4 bg-white">
-                  <h5 className="fw-bold text-navy mb-3">Athletic Performance Standings</h5>
+                  <h5 className="fw-bold text-navy mb-3">Performance standings</h5>
                   <div className="row g-3">
                     <div className="col-sm-4">
                       <div className="p-3 bg-light rounded-3 text-center">
@@ -388,21 +487,6 @@ export default function PlayerDashboard() {
 
         </div>
       </div>
-
-      {/* TOAST MESSAGE */}
-      {toast.show && (
-        <div className="position-fixed bottom-0 end-0 m-4 p-3 rounded-4 shadow-lg text-white" style={{
-          background: 'var(--navy)',
-          borderLeft: '5px solid var(--gold)',
-          zIndex: 1050,
-          animation: 'fadeInUp 0.3s ease-out'
-        }}>
-          <div className="d-flex align-items-center gap-2">
-            <span>🎉</span>
-            <span className="fw-semibold">{toast.message}</span>
-          </div>
-        </div>
-      )}
     </>
   );
 }

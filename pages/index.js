@@ -13,31 +13,31 @@ const TAMIL_NADU_DISTRICTS = [
 
 const gallerySlides = [
   {
-    img: "https://images.unsplash.com/photo-1531415080290-bc98545ab5fc?auto=format&fit=crop&w=1200&q=80",
+    img: "/images/cover_drive.webp",
     tag: "CRICKET",
     title: "State T20 League Championship",
     desc: "Elite club teams clash in Chennai for the final tournament cup."
   },
   {
-    img: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+    img: "/images/bycycle.jpg",
     tag: "FOOTBALL",
     title: "Tamil Nadu Football League Qualifier",
     desc: "Top district squads compete for promotion in the state finals."
   },
   {
-    img: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80",
-    tag: "BASKETBALL",
-    title: "Salem Basketball Invitational Cup",
+    img: "/images/handball.jpg",
+    tag: "HANDBALL",
+    title: "Salem Handball Invitational Cup",
     desc: "Intense high-school and college tournament leagues showing local talent."
   },
   {
-    img: "https://images.unsplash.com/photo-1592656094267-764a45160876?auto=format&fit=crop&w=1200&q=80",
+    img: "/images/volleyball.jpeg",
     tag: "VOLLEYBALL",
     title: "Coimbatore District Volleyball Open",
     desc: "Fast-paced rallies in front of packed stadium crowds in Kovai."
   },
   {
-    img: "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80",
+    img: "/images/badminton.webp",
     tag: "BADMINTON",
     title: "Madurai Badminton Masters Singles",
     desc: "Regional seeded players showcasing absolute agility and speed."
@@ -223,16 +223,41 @@ export default function Home() {
       </nav>
 
       {/* HERO */}
-      <section id="hero">
-        <div className="hero-ring"></div>
-        <div className="hero-ring"></div>
-        <div className="container position-relative">
+      <section id="hero" style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Kohli MCG Six Video Background */}
+        <div className="position-absolute top-0 start-0 w-100 h-100 overflow-hidden" style={{ zIndex: 0 }}>
+          <video 
+            autoPlay 
+            muted 
+            loop 
+            playsInline 
+            className="w-100 h-100"
+            style={{ objectFit: 'cover' }}
+          >
+            <source src="/images/hero_video.mp4" type="video/mp4" />
+          </video>
+          <div className="position-absolute top-0 start-0 w-100 h-100" style={{
+            background: 'linear-gradient(to bottom, rgba(10,36,99,0.85) 0%, rgba(10,36,99,0.7) 100%)'
+          }}></div>
+        </div>
+
+        <div className="hero-ring" style={{ zIndex: 1 }}></div>
+        <div className="hero-ring" style={{ zIndex: 1 }}></div>
+        <div className="container position-relative" style={{ zIndex: 2 }}>
           <div className="hero-badge fade-in">Tamil Nadu&rsquo;s Unified Sports Platform</div>
           <h1 className="hero-title fade-in-2">PLAY <span>TN</span></h1>
           <p className="hero-sub fade-in-2">Connecting Athletes, Organizers &amp; Coaches Across All 38 Districts</p>
           <div className="d-flex gap-3 justify-content-center mt-4 fade-in-3">
             <a href="#matches" className="btn btn-warning fw-bold px-4 py-2 rounded-pill">View Matches</a>
-            <Link href="/register" className="btn btn-outline-light fw-semibold px-4 py-2 rounded-pill">Register Now</Link>
+            {currentUser ? (
+              <Link href={`/dashboard/${currentUser.role.toLowerCase()}`} className="btn btn-outline-light fw-semibold px-4 py-2 rounded-pill">
+                View Dashboard
+              </Link>
+            ) : (
+              <Link href="/register" className="btn btn-outline-light fw-semibold px-4 py-2 rounded-pill">
+                Register Now
+              </Link>
+            )}
           </div>
           <div className="hero-stats">
             <div className="hstat"><div className="num">10M+</div><div className="lbl">Athletes</div></div>
