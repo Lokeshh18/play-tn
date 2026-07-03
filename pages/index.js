@@ -197,15 +197,21 @@ export default function Home() {
         .order('tournament_start', { ascending: true });
 
       if (tournamentsData) {
-        setMatches(tournamentsData.map(t => ({
-          id: t.id,
-          title: t.name,
-          location: t.district,
-          date: new Date(t.tournament_start).toLocaleDateString(),
-          sport: t.sport,
-          emoji: sportMeta[t.sport]?.emoji || '🏆',
-          posterUrl: t.poster_url || ''
-        })));
+        setMatches(tournamentsData.map(t => {
+          let resolvedPoster = t.poster_url || '';
+          if (resolvedPoster.startsWith('local_poster_') && typeof window !== 'undefined') {
+            resolvedPoster = localStorage.getItem(resolvedPoster) || '';
+          }
+          return {
+            id: t.id,
+            title: t.name,
+            location: t.district,
+            date: new Date(t.tournament_start).toLocaleDateString(),
+            sport: t.sport,
+            emoji: sportMeta[t.sport]?.emoji || '🏆',
+            posterUrl: resolvedPoster
+          };
+        }));
       }
 
       // 2. Fetch leaderboard standings

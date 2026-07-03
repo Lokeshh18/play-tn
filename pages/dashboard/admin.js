@@ -91,14 +91,20 @@ export default function AdminDashboard() {
         .eq('status', 'SUBMITTED');
 
       if (tourneys) {
-        setPendingTournaments(tourneys.map(t => ({
-          id: t.id,
-          name: t.name,
-          sport: t.sport,
-          organiser: t.organiser_profiles?.organisation_name || 'Organiser Academy',
-          date: t.tournament_start ? new Date(t.tournament_start).toLocaleDateString() : 'TBD',
-          posterUrl: t.poster_url || ''
-        })));
+        setPendingTournaments(tourneys.map(t => {
+          let resolvedPoster = t.poster_url || '';
+          if (resolvedPoster.startsWith('local_poster_') && typeof window !== 'undefined') {
+            resolvedPoster = localStorage.getItem(resolvedPoster) || '';
+          }
+          return {
+            id: t.id,
+            name: t.name,
+            sport: t.sport,
+            organiser: t.organiser_profiles?.organisation_name || 'Organiser Academy',
+            date: t.tournament_start ? new Date(t.tournament_start).toLocaleDateString() : 'TBD',
+            posterUrl: resolvedPoster
+          };
+        }));
       }
 
     } catch (err) {

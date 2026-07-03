@@ -151,6 +151,14 @@ export default function OrganiserDashboard() {
     setLoading(true);
 
     try {
+      let dbPosterUrl = newTournament.posterUrl;
+      
+      if (newTournament.posterUrl && newTournament.posterUrl.startsWith('data:image/')) {
+        const posterKey = `local_poster_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem(posterKey, newTournament.posterUrl);
+        dbPosterUrl = posterKey;
+      }
+
       const { error } = await supabase
         .from('tournaments')
         .insert([{
@@ -170,7 +178,7 @@ export default function OrganiserDashboard() {
           prize_pool: parseFloat(newTournament.prizePool) || 0.00,
           min_teams: parseInt(newTournament.minTeams) || null,
           max_teams: parseInt(newTournament.maxTeams) || null,
-          poster_url: newTournament.posterUrl,
+          poster_url: dbPosterUrl,
           status: 'SUBMITTED'
         }]);
 

@@ -73,6 +73,10 @@ export default function PlayerDashboard() {
       const localPic = localStorage.getItem(`player_profile_pic_${user.id}`);
 
       if (profileData) {
+        const profilePicVal = profileData.profile_pic === 'local_storage'
+          ? localPic
+          : (profileData.profile_pic || localPic || '');
+
         const mapped = {
           age: profileData.age || '',
           dob: profileData.dob || '',
@@ -82,7 +86,7 @@ export default function PlayerDashboard() {
           preferredSport: profileData.preferred_sport || 'Cricket',
           bio: profileData.bio || '',
           achievements: profileData.achievements || '',
-          profilePic: profileData.profile_pic || localPic || ''
+          profilePic: profilePicVal
         };
         setProfile(mapped);
         setUpdatedProfile(mapped);
@@ -223,6 +227,10 @@ export default function PlayerDashboard() {
         localStorage.setItem(`player_profile_pic_${user.id}`, updatedProfile.profilePic);
       }
 
+      const dbProfilePic = updatedProfile.profilePic && updatedProfile.profilePic.startsWith('data:image/')
+        ? 'local_storage'
+        : updatedProfile.profilePic;
+
       const { error } = await supabase
         .from('player_profiles')
         .upsert({
@@ -235,7 +243,7 @@ export default function PlayerDashboard() {
           preferred_sport: updatedProfile.preferredSport,
           bio: updatedProfile.bio,
           achievements: updatedProfile.achievements,
-          profile_pic: updatedProfile.profilePic
+          profile_pic: dbProfilePic
         });
 
       if (error) throw error;
